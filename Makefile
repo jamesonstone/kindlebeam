@@ -3,7 +3,7 @@ BINARY := kindlebeam
 .PHONY: build run test clean fmt lint
 
 build:
-	go build -o ./bin/kindlebeam/$(BINARY) .
+	go build -o ./bin/$(BINARY) .
 
 run:
 	go run .
