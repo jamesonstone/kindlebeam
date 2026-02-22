@@ -8,350 +8,245 @@
 
 `kindlebeam` is a small Go-based CLI that:
 
-- converts one or more input documents to a Kindle-friendly format using pandoc
-- emails the converted files to your Kindle email address using the macOS `mail` command
-- cleans up temporary converted files for the default workflow
+- 📄 converts one or more input documents to a Kindle-friendly format using `pandoc`
+- 📧 emails the converted files to your Kindle email address via automatic mail backend detection
+- 🧹 cleans up temporary converted files after successful delivery
+- 🔄 supports **Linux**, **macOS**, and other Unix-like systems
 
-Default workflow:
-
-- input: markdown (`.md`)
-- output: pdf
-- action: convert → email to Kindle.
-
-```sh
-kindlebeam config set kindle-email your_name@kindle.com
-kindlebeam docs/specs/file.md
-```
-
-This converts `file.md`→`./kindlebeam_out/file.pdf`, sends it to your Kindle, and removes the pdf when the email succeeds.
+Default workflow: `kindlebeam notes/today.md` → infers format → converts → emails → cleans up
 
 ---
 
 ## requirements
 
-### runtime dependencies
+### installation
 
-- `pandoc` on your `PATH` (or configured via `pandoc_path` in config)
-- `mail` on your `PATH` (macOS BSD `mail`, or configured via `mail_command`)
+**pandoc:**
 
-### kindle setup
+```bash
+brew install pandoc              # macOS
+sudo apt install pandoc          # Ubuntu/Debian
+sudo dnf install pandoc          # Fedora/RHEL
+sudo pacman -S pandoc            # Arch
+```
 
-- you must have a Kindle email address (e.g. `your_name@kindle.com`)
-- that address must be configured in your Amazon Kindle settings
-- the sender address used by your system `mail` must be whitelisted in your Amazon “Approved Personal Document E-mail List”
+**mail binary** (auto-detected; macOS built-in `/usr/bin/mail` lacks attachment support):
 
----
+```bash
+brew install mailutils           # macOS (GNU mail) or
+brew install mutt                # macOS alt: full-featured
+sudo apt install mailutils       # Ubuntu/Debian
+sudo dnf install mailx           # Fedora/RHEL
+```
 
-## installation
+**build from source:**
 
-### from source (recommended for now)
-
-```sh
-git clone https://github.com/jamesonstone/kindlebeam.git
-cd kindlebeam
+```bash
+git clone https://github.com/jamesonstone/kindlebeam.git && cd kindlebeam
 make build
-./kindlebeam --version
+cp kindlebeam /usr/local/bin/    # optional: install to PATH
 ```
 
-This builds a single `kindlebeam` binary in the repo root.
+**or via go:**
 
-To install it somewhere on your `PATH`:
-
-```sh
-cp kindlebeam /usr/local/bin/
-```
-
-### go install (if the module is available)
-
-```sh
+```bash
 go install github.com/jamesonstone/kindlebeam@latest
 ```
 
-This places the binary in your Go bin directory (often `~/go/bin`).
+### Kindle setup
+
+- ✉️ create/have a **Kindle email** address (e.g. `your_name@kindle.com`)
+- 🔧 **whitelist your sender address** in Amazon Kindle settings → "Approved Personal Document E-mail List"
 
 ---
 
-## prerequisite
-
-install `pandoc` with homebrew: `brew install pandoc`
-
 ## quick start
 
-1. configure your Kindle email:
+```bash
+# 1️⃣ configure Kindle email
+kindlebeam config set kindle-email your_name@kindle.com
 
-   ```sh
-   kindlebeam config set kindle-email your_name@kindle.com
-   ```
+# 2️⃣ convert & send
+kindlebeam notes/today.md
+# → detects .md → converts to pdf → sends → cleans up
 
-2. convert and send a markdown file:
-
-   ```sh
-   kindlebeam notes/today.md
-   ```
-
-   behavior:
-
-   - infers input format from `.md` → `markdown`
-   - uses default output format `pdf`
-   - writes `./kindlebeam_out/today.pdf`
-   - sends `today.pdf` to your configured Kindle email
-   - removes `today.pdf` after a successful send
-
-3. preview what would happen (no pandoc, no mail):
-
-   ```sh
-   kindlebeam --dry-run --verbose notes/today.md
-   ```
-
-   this prints the pandoc and mail commands that would be executed but performs no changes.
+# 3️⃣ preview (dry run)
+kindlebeam --dry-run --verbose notes/today.md
+```
 
 ---
 
 ## commands
 
-### root: `kindlebeam`
+### `kindlebeam` (default: convert + send)
 
-Usage:
+**Usage:** `kindlebeam [flags] <input-file>...`
 
-```sh
-kindlebeam [flags] <input-file>...
+| Flag                     | Purpose                                           |
+| ------------------------ | ------------------------------------------------- |
+| `--dry-run`              | 🏃 show commands, don't execute                   |
+| `--verbose, -v`          | 🔍 detailed output & errors                       |
+| `--input-format <fmt>`   | 📄 input format (auto-detected)                   |
+| `--output-format <fmt>`  | 📄 output format (default: `pdf`)                 |
+| `--output-dir <path>`    | 📁 output directory (default: `./kindlebeam_out`) |
+| `--kindle-email <email>` | ✉️ override config email                          |
+| `--subject <text>`       | 📝 email subject (default: filename)              |
+| `--no-send`              | ❌ convert only                                   |
+| `--no-clean`             | 🚫 keep converted files                           |
+| `--pandoc-args "<args>"` | ⚙️ extra pandoc arguments                         |
+| `--version`              | ℹ️ show version                                   |
+
+### `convert` (pandoc only)
+
+**Usage:** `kindlebeam convert [flags] <input-file>...`
+
+```bash
+kindlebeam convert docs/file.md                    # → pdf
+kindlebeam convert --from org --to epub docs/file  # → epub
+kindlebeam convert --to html --pandoc-args "--toc" file.md
 ```
 
-behavior:
+| Flag                     | Purpose           |
+| ------------------------ | ----------------- |
+| `--from, -f <fmt>`       | input format      |
+| `--to, -t <fmt>`         | output format     |
+| `--output-dir <path>`    | output directory  |
+| `--pandoc-args "<args>"` | extra pandoc args |
 
-- when called without a subcommand, performs **convert + send** for each input file
-- one email is sent per converted file
+### `send` (email only)
 
-key flags:
+**Usage:** `kindlebeam send [flags] <file>...`
 
-- `--verbose, -v` – enable verbose logging
-- `--dry-run` – compute work and print planned commands without running pandoc or mail
-- `--input-format <format>` – explicit pandoc input format; default is autodetect by file extension → config default (`markdown`)
-- `--output-format <format>` – explicit pandoc output format; default is config default (`pdf`)
-- `--output-dir <path>` – directory for converted files (default: `./kindlebeam_out`)
-- `--kindle-email <email>` – override Kindle email from config
-- `--subject <subject>` – email subject (default derived from input filename)
-- `--no-send` – convert only, do not email
-- `--no-clean` – keep converted files after successful send
-- `--pandoc-args "<args>"` – extra arguments passed verbatim to pandoc, parsed with a shellwords-style parser
-
-special flag:
-
-- `--version` – print version and exit
-
-### `convert` command
-
-Usage:
-
-```sh
-kindlebeam convert [flags] <input-file>...
+```bash
+kindlebeam send kindlebeam_out/notes.pdf
+kindlebeam send --subject "reading list" *.pdf
+kindlebeam send --kindle-email alternate@kindle.com file.pdf
 ```
 
-behavior:
+| Flag                     | Purpose                                       |
+| ------------------------ | --------------------------------------------- |
+| `--kindle-email <email>` | override Kindle email                         |
+| `--subject <text>`       | subject line                                  |
+| `--body <text>`          | body text (default: `"sent with kindlebeam"`) |
 
-- convert one or more input files using pandoc
-- writes outputs to `--output-dir` or `./kindlebeam_out`
-- **does not** email files
+### `config` (settings)
 
-flags:
+**Usage:** `kindlebeam config <subcommand>`
 
-- `--from, -f <format>` – input format (alias for `--input-format`)
-- `--to, -t <format>` – output format (alias for `--output-format`)
-- `--input-format <format>` – explicit input format
-- `--output-format <format>` – explicit output format
-- `--output-dir <path>` – output directory (default `./kindlebeam_out`)
-- `--pandoc-args "<args>"` – extra pandoc arguments
-
-examples:
-
-```sh
-# markdown → pdf into kindlebeam_out
-kindlebeam convert docs/specs/file.md
-
-# org → epub into custom directory
-kindlebeam convert --from org --to epub --output-dir out docs/notes.org
-```
-
-### `send` command
-
-Usage:
-
-```sh
-kindlebeam send [flags] <file>...
-```
-
-behavior:
-
-- send one or more existing files as email attachments via `mail`
-- never deletes or moves the provided files
-
-flags:
-
-- `--kindle-email <email>` – override Kindle email from config
-- `--subject <subject>` – subject line (default derived from filename)
-- `--body <text>` – email body text (default `"sent with kindlebeam"`)
-
-example:
-
-```sh
-# send an already generated pdf
-kindlebeam send --subject "weekly notes" kindlebeam_out/notes.pdf
-```
-
-### `config` command
-
-Usage:
-
-```sh
-kindlebeam config <subcommand> [...]
-```
-
-subcommands:
-
-- `show` – print effective configuration and resolved config file path
-- `set kindle-email <email>` – set primary Kindle email
-- `set default-output-format <format>` – set default pandoc output format
-- `set mail-command <cmd>` – set the `mail` command or path
-- `set pandoc-path <path>` – set the pandoc binary or path
-
-examples:
-
-```sh
+```bash
 kindlebeam config show
 kindlebeam config set kindle-email your_name@kindle.com
 kindlebeam config set default-output-format epub
-kindlebeam config set mail-command mail
+kindlebeam config set mail-command mutt
 kindlebeam config set pandoc-path /usr/local/bin/pandoc
 ```
 
+| Subcommand                        | Purpose                       |
+| --------------------------------- | ----------------------------- |
+| `show`                            | display config & location     |
+| `set kindle-email <email>`        | set Kindle email              |
+| `set default-output-format <fmt>` | default output format         |
+| `set mail-command <cmd>`          | set mail binary/path          |
+| `set pandoc-path <path>`          | set pandoc binary/path        |
+| `set default-input-format <fmt>`  | format for unknown extensions |
+
 ---
 
-## configuration
+## 🔧 configuration
 
-### file location
+**default location:**
 
-by default, config is stored as JSON at:
+- macOS: `~/Library/Application Support/kindlebeam/config.json`
+- Linux: `~/.config/kindlebeam/config.json`
+- override: `export KINDLEBEAM_CONFIG=$HOME/.kindlebeam.json`
 
-- macOS: `${UserConfigDir}/kindlebeam/config.json` (typically `~/Library/Application Support/kindlebeam/config.json`)
-- Linux: `${UserConfigDir}/kindlebeam/config.json` (typically `~/.config/kindlebeam/config.json`)
-
-you can override the config path with the `KINDLEBEAM_CONFIG` environment variable:
-
-```sh
-export KINDLEBEAM_CONFIG=$HOME/.kindlebeam.json
-kindlebeam config set kindle-email your_name@kindle.com
-```
-
-### schema
-
-example `config.json`:
+**schema:**
 
 ```json
 {
   "kindle_email": "your_name@kindle.com",
-  "default_kindle_email": "your_name@kindle.com",
   "default_output_format": "pdf",
   "default_input_format": "markdown",
-  "mail_command": "mail",
+  "mail_command": "mail", // auto-detected if omitted
   "pandoc_path": "pandoc"
 }
 ```
 
-field behavior:
-
-- `kindle_email` – primary Kindle address used for sending
-- `default_kindle_email` – legacy / fallback Kindle address if `kindle_email` is empty
-- `default_output_format` – default pandoc output format (e.g. `pdf`, `epub`)
-- `default_input_format` – used when file extension cannot be mapped
-- `mail_command` – command or path for the `mail` binary
-- `pandoc_path` – command or path for the `pandoc` binary
-
-CLI flags always override config values for a single invocation.
+**precedence:** CLI flags > config values
 
 ---
 
 ## format detection
 
-when `--input-format` / `--from` is not provided, `kindlebeam` infers formats from file extensions:
+**input** (auto-detected from extension; fallback: `markdown`):
+`.md/.markdown`→`markdown`, `.org`→`org`, `.rst`→`rst`, `.tex`→`latex`, `.html/.htm`→`html`, `.docx`→`docx`, `.epub`→`epub`
 
-- `.md`, `.markdown` → `markdown`
-- `.org` → `org`
-- `.rst` → `rst`
-- `.tex` → `latex`
-- `.html`, `.htm` → `html`
-- `.docx` → `docx`
-- `.epub` → `epub`
-
-if the extension is unknown, it falls back to `default_input_format` from config, then `markdown`.
-
-output extensions are derived from the output format:
-
-- `pdf` → `.pdf`
-- `epub` → `.epub`
-- `docx` → `.docx`
-- anything else → `.<format>`
+**output** (extension derived from format): `.pdf`, `.epub`, `.docx`, `.html`, etc.
 
 ---
 
-## logging and troubleshooting
+## 📧 mail backends
 
-logging uses emoji-prefixed, human-friendly messages:
+**auto-detection order:** `mail`/`mailx` (GNU) → `mutt` → `s-nail` → `sendmail` (MIME fallback)
 
-- `ℹ️` info
-- `✅` success
-- `❌` error
-- `🔍` debug (only when `--verbose` is enabled)
+**⚠️ macOS note:** built-in `/usr/bin/mail` lacks attachment support; install `mailutils` instead.
 
-recommendations:
+**explicit configuration:**
 
-- use `--dry-run` first when wiring up new workflows or experimenting with `--pandoc-args`
-- add `--verbose` when debugging failures to see more detail (including stderr from pandoc or mail)
+```bash
+kindlebeam config set mail-command mutt              # or: sendmail, s-nail, mailx
+kindlebeam config set mail-command /usr/local/bin/mailx  # full path
+```
 
-common issues:
+---
 
-- **`pandoc not found`** – install pandoc or set `pandoc_path` in config
-- **`mail not found`** – ensure macOS `mail` is available or adjust `mail_command`
-- **`kindle email is not configured`** – run `kindlebeam config set kindle-email <email>` or pass `--kindle-email`
-- **no document appears on Kindle** – verify your Kindle email and approved sender list in your Amazon account
+## troubleshooting
+
+**💡 tips:** Use `--dry-run --verbose` before sending; run `kindlebeam config show` to verify settings
+
+**common issues:**
+
+| Issue                            | Fix                                                                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pandoc: command not found`      | Install pandoc (see [installation](#installation)) OR `kindlebeam config set pandoc-path /path/to/pandoc`                                                                |
+| `mail command not found`         | Install mail binary (see [installation](#installation)) OR `kindlebeam config set mail-command mutt`                                                                     |
+| macOS: attachment not supported  | `brew install mailutils` replaces broken built-in `/usr/bin/mail`                                                                                                        |
+| `kindle email is not configured` | `kindlebeam config set kindle-email your_name@kindle.com`                                                                                                                |
+| document not on Kindle           | ✅ verify email in config; ✅ check Amazon Kindle settings; ✅ whitelist sender in "Approved Personal Document E-mail List"; ✅ run `kindlebeam send --verbose` for logs |
+| `sendmail` errors                | Ensure local mail system running; try `kindlebeam config set mail-command mutt`                                                                                          |
 
 ---
 
 ## development
 
-### project layout
+**layout:**
 
-- `main.go` – entrypoint calling the cobra root command
-- `cmd/kindlebeam` – CLI commands (`kindlebeam`, `convert`, `send`, `config`)
-- `internal/config` – config load/save and defaults
-- `internal/app` – logger and workflows (convert, send, convert+send)
-- `internal/pandoc` – thin wrapper around the `pandoc` binary
-- `internal/mailer` – thin wrapper around the system `mail` binary
+- `main.go` – entrypoint
+- `cmd/kindlebeam/` – CLI commands (root, convert, send, config)
+- `internal/config/` – config load/save
+- `internal/app/` – workflows & logger
+- `internal/pandoc/` – pandoc wrapper
+- `internal/mailer/` – multi-backend mail client
 
-### build and test
+**build:**
 
-use the `Makefile` targets:
+```bash
+make build   # compile
+make test    # run tests
+make fmt     # format
+make lint    # lint (if golangci-lint installed)
 
-```sh
-make build   # go build -o kindlebeam .
-make test    # go test ./...
-make fmt     # gofmt -w ./
-make lint    # golangci-lint run ./... (if installed)
-```
-
-### running locally
-
-```sh
-make build
 ./kindlebeam --help
-./kindlebeam --dry-run examples/sample.md
+./kindlebeam --dry-run ~/notes/sample.md --verbose
 ```
 
 ---
 
-## roadmap / future ideas
+## roadmap
 
-- support SMTP or API-based email backends (SES, SendGrid, etc.)
-- combine multiple input files into a single document before sending
-- inject metadata such as title and author into converted documents
-- add a watch mode to auto-convert and send on file changes
-- richer templating for email subjects and bodies
+- 📬 SMTP/API email backends (SES, SendGrid)
+- 📦 combine multiple files before sending
+- ✏️ document metadata injection
+- 👀 watch mode for auto-conversion
+- 🎨 email template support
+- 🌐 GUI/web interface
