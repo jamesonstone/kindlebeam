@@ -189,7 +189,7 @@ kindlebeam config set pandoc-path /usr/local/bin/pandoc
 
 **auto-detection order:** `mail`/`mailx` (GNU) → `mutt` → `s-nail` → `sendmail` (MIME fallback)
 
-**⚠️ macOS note:** built-in `/usr/bin/mail` lacks attachment support; install `mailutils` instead.
+**⚠️ macOS note:** built-in `/usr/bin/mail` lacks attachment support; kindlebeam auto-falls back to `sendmail` when available.
 
 **explicit configuration:**
 
@@ -210,7 +210,7 @@ kindlebeam config set mail-command /usr/local/bin/mailx  # full path
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pandoc: command not found`      | Install pandoc (see [installation](#installation)) OR `kindlebeam config set pandoc-path /path/to/pandoc`                                                                |
 | `mail command not found`         | Install mail binary (see [installation](#installation)) OR `kindlebeam config set mail-command mutt`                                                                     |
-| macOS: attachment not supported  | `brew install mailutils` replaces broken built-in `/usr/bin/mail`                                                                                                        |
+| macOS: attachment not supported  | kindlebeam auto-falls back to `sendmail`; if unavailable, install `mailutils` or set `mail-command` to `mutt`/`s-nail`                                                  |
 | `kindle email is not configured` | `kindlebeam config set kindle-email your_name@kindle.com`                                                                                                                |
 | document not on Kindle           | ✅ verify email in config; ✅ check Amazon Kindle settings; ✅ whitelist sender in "Approved Personal Document E-mail List"; ✅ run `kindlebeam send --verbose` for logs |
 | `sendmail` errors                | Ensure local mail system running; try `kindlebeam config set mail-command mutt`                                                                                          |

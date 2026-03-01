@@ -17,6 +17,13 @@ type Client struct {
 	binaryName string
 }
 
+func attachmentFlagUnsupported(stderr string) bool {
+	msg := strings.ToLower(stderr)
+	return strings.Contains(msg, "illegal option -- a") ||
+		strings.Contains(msg, "unknown option -- a") ||
+		strings.Contains(msg, "invalid option -- a")
+}
+
 type SendRequest struct {
 	To          string
 	Subject     string
@@ -109,10 +116,16 @@ func (c *Client) sendWithMail(ctx context.Context, req SendRequest) (SendResult,
 
 	if err := cmd.Run(); err != nil {
 		stderrStr := stderr.String()
-		// Detect macOS mail without attachment support
-		if strings.Contains(stderrStr, "illegal option -- a") {
+		if len(req.Attachments) > 0 && attachmentFlagUnsupported(stderrStr) {
+			if fallbackPath, lookupErr := exec.LookPath("sendmail"); lookupErr == nil {
+				fallback := &Client{
+					binary:     fallbackPath,
+					binaryName: filepath.Base(fallbackPath),
+				}
+				return fallback.sendWithSendmail(ctx, req)
+			}
 			return SendResult{Command: append([]string{c.binary}, args...), Stderr: stderrStr},
-				fmt.Errorf("mail failed: macOS built-in mail does not support attachments.\n" +
+				fmt.Errorf("mail failed: built-in mail does not support attachments and sendmail was not found.\n" +
 					"Install GNU mailutils: brew install mailutils\n" +
 					"Or configure a different mail command: kindlebeam config set mail-command <command>")
 		}
